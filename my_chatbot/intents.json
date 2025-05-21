@@ -52,9 +52,23 @@
                 "What is your purpose"
             ],
             "responses": [
-                "I am a chatbot",
+                "I am a chatbot Created by Dhruvil Nakrani",
                 "My purpose is to assist you",
                 "I can answer questions and provide assistance"
+            ]
+        },
+        {
+            "tag": "dhruvil",
+            "patterns": [
+                "who is Dhruvil ?",
+                "Who is Dhruvil Nakrani",
+                "By whom you are created?",
+                "Give Description about Dhruvil Nakrani"
+            ],
+            "responses": [
+                "Dhruvil Nakrani is Software Engineer",
+                "Dhruvil Nakrani is Proffetional Python Full Stack Developer",
+                "Dhruvil Nakrani is Skilled Software Engineer from Uka Tarsadia University"
             ]
         },
         {
