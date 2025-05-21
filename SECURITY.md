@@ -19,7 +19,7 @@ We prioritize security updates for actively maintained versions. Below is the li
 If you discover a security vulnerability, we encourage you to report it responsibly. Please follow the steps below:
 
 1. **Report via Email**:  
-   Email us at **[dhnakrani80@gmail.com](mailto:dhnakrani80@gmail.com)** with the subject line: `Vulnerability Report: [Project Name]`.
+   Email me at **[dhnakrani80@gmail.com](mailto:dhnakrani80@gmail.com)** with the subject line: `Vulnerability Report: [Project Name]`.
 
 2. **Include Necessary Details**:
    - Describe the vulnerability in detail.
