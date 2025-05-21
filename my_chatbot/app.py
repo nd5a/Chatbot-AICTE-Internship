@@ -202,7 +202,12 @@ def chatbot_response():
     except Exception as e:
         return f"An error occurred: {str(e)}"
 
-# Run the app
+# # Run the app
+# if __name__ == "__main__":
+#     port = int(os.environ.get("PORT", 5000))
+#     app.run(host="0.0.0.0", port=port, debug=os.environ.get("DEBUG", False))
+# Replace the existing __main__ block with:
 if __name__ == "__main__":
+    from waitress import serve
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=os.environ.get("DEBUG", False))
+    serve(app, host="0.0.0.0", port=port)
