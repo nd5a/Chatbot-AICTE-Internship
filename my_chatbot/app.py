@@ -1,97 +1,4 @@
-# from flask import Flask, render_template, request, jsonify
-# import nltk
-# from nltk.stem import WordNetLemmatizer
-# import pickle
-# import numpy as np
-# from keras.models import load_model
-# import json
-# import random
-
-# # Initialize Flask app
-# app = Flask(__name__)
-
-# # Load the necessary files
-# lemmatizer = WordNetLemmatizer()
-# model = load_model(r'E:\Edunet Internship\my_chatbot\chatbot_model.h5')
-# intents = json.loads(open(r'E:\Edunet Internship\my_chatbot\intents.json').read())
-# words = pickle.load(open(r'E:\Edunet Internship\my_chatbot\words.pkl', 'rb'))
-# classes = pickle.load(open(r'E:\Edunet Internship\my_chatbot\classes.pkl', 'rb'))
-
-# def clean_up_sentence(sentence):
-#     """
-#     Tokenize and lemmatize the input sentence.
-#     """
-#     sentence_words = nltk.word_tokenize(sentence)
-#     sentence_words = [lemmatizer.lemmatize(word.lower()) for word in sentence_words]
-#     return sentence_words
-
-# def bow(sentence, words):
-#     """
-#     Create a bag of words for the input sentence.
-#     """
-#     sentence_words = clean_up_sentence(sentence)
-#     bag = [0] * len(words)
-#     for s in sentence_words:
-#         for i, w in enumerate(words):
-#             if w == s:
-#                 bag[i] = 1
-#     return np.array(bag)
-
-# def predict_class(sentence, model):
-#     """
-#     Predict the class of the input sentence.
-#     """
-#     p = bow(sentence, words)
-#     res = model.predict(np.array([p]))[0]
-#     ERROR_THRESHOLD = 0.25
-#     results = [[i, r] for i, r in enumerate(res) if r > ERROR_THRESHOLD]
-#     results.sort(key=lambda x: x[1], reverse=True)
-#     if not results:
-#         return []
-#     return [{"intent": classes[r[0]], "probability": str(r[1])} for r in results]
-
-# def get_response(ints, intents_json):
-#     """
-#     Get the response for the predicted intent.
-#     Handles cases where no intent is matched.
-#     """
-#     if not ints:  # Handle case with no matching intents
-#         return "I'm not sure I understand that. Can you try rephrasing?"
-    
-#     tag = ints[0]['intent']
-#     for i in intents_json['intents']:
-#         if i['tag'] == tag:
-#             return random.choice(i['responses'])
-#     return "I'm not sure I understand that. Can you try rephrasing?"
-
-# @app.route('/')
-# def home():
-#     """
-#     Render the chatbot home page.
-#     Ensure there is an 'index.html' file in the templates folder.
-#     """
-#     return render_template('index.html')
-
-# @app.route('/get', methods=['GET'])
-# def chatbot_response():
-#     """
-#     Process the user message and return a response.
-#     """
-#     try:
-#         msg = request.args.get('msg')
-#         if not msg:
-#             return "Please provide a valid input."
-        
-#         ints = predict_class(msg, model)
-#         res = get_response(ints, intents)
-#         return res
-#     except Exception as e:
-#         return f"An error occurred: {str(e)}"
-
-# # Run the app
-# if __name__ == "__main__":
-#     app.run(debug=True)
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 import nltk
 from nltk.stem import WordNetLemmatizer
 import pickle
@@ -100,49 +7,57 @@ from keras.models import load_model
 import json
 import random
 import os
+from waitress import serve
 
-nltk.download('wordnet')
-nltk.download('punkt_tab') 
-nltk.data.path.append('./nltk_data')  # Specify a custom directory for NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt', download_dir='./nltk_data')
+# NLTK Configuration
+nltk_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nltk_data')
+nltk.data.path.append(nltk_data_path)
+
+# Download required NLTK data
+required_nltk_data = ['punkt', 'wordnet', 'omw-1.4', 'punkt_tab']
+for data in required_nltk_data:
+    try:
+        nltk.data.find(f'tokenizers/{data}' if data == 'punkt' else f'corpora/{data}' if data == 'wordnet' else data)
+    except LookupError:
+        nltk.download(data, download_dir=nltk_data_path)
+
 # Initialize Flask app
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
 
-# Load the necessary files dynamically
+# Load ML resources
+def load_resources():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    resources = {
+        'model': ('chatbot_model.h5', lambda path: load_model(path)),
+        'intents': ('intents.json', lambda path: json.load(open(path))),
+        'words': ('words.pkl', lambda path: pickle.load(open(path, 'rb'))),
+        'classes': ('classes.pkl', lambda path: pickle.load(open(path, 'rb')))
+    }
+    
+    loaded = {}
+    for name, (filename, loader) in resources.items():
+        try:
+            path = os.path.join(base_dir, filename)
+            loaded[name] = loader(path)
+        except Exception as e:
+            app.logger.error(f"Error loading {name}: {str(e)}")
+            raise
+    return loaded
+
+# Load all resources at startup
+resources = load_resources()
+
+# NLP Processing
 lemmatizer = WordNetLemmatizer()
 
-# Use relative paths for deployment compatibility
-base_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(base_dir, "chatbot_model.h5")
-intents_path = os.path.join(base_dir, "intents.json")
-words_path = os.path.join(base_dir, "words.pkl")
-classes_path = os.path.join(base_dir, "classes.pkl")
-
-# Load resources
-try:
-    model = load_model(model_path)
-    intents = json.loads(open(intents_path).read())
-    words = pickle.load(open(words_path, 'rb'))
-    classes = pickle.load(open(classes_path, 'rb'))
-except Exception as e:
-    print(f"Error loading resources: {str(e)}")
-    exit(1)
-
 def clean_up_sentence(sentence):
-    """
-    Tokenize and lemmatize the input sentence.
-    """
     sentence_words = nltk.word_tokenize(sentence)
-    sentence_words = [lemmatizer.lemmatize(word.lower()) for word in sentence_words]
-    return sentence_words
+    return [lemmatizer.lemmatize(word.lower()) for word in sentence_words]
 
 def bow(sentence, words):
-    """
-    Create a bag of words for the input sentence.
-    """
     sentence_words = clean_up_sentence(sentence)
     bag = [0] * len(words)
     for s in sentence_words:
@@ -151,25 +66,16 @@ def bow(sentence, words):
                 bag[i] = 1
     return np.array(bag)
 
-def predict_class(sentence, model):
-    """
-    Predict the class of the input sentence.
-    """
+def predict_class(sentence, model, words, classes):
     p = bow(sentence, words)
     res = model.predict(np.array([p]))[0]
     ERROR_THRESHOLD = 0.25
     results = [[i, r] for i, r in enumerate(res) if r > ERROR_THRESHOLD]
     results.sort(key=lambda x: x[1], reverse=True)
-    if not results:
-        return []
-    return [{"intent": classes[r[0]], "probability": str(r[1])} for r in results]
+    return [{"intent": classes[r[0]], "probability": str(r[1])} for r in results] if results else []
 
 def get_response(ints, intents_json):
-    """
-    Get the response for the predicted intent.
-    Handles cases where no intent is matched.
-    """
-    if not ints:  # Handle case with no matching intents
+    if not ints:
         return "I'm not sure I understand that. Can you try rephrasing?"
     
     tag = ints[0]['intent']
@@ -178,36 +84,49 @@ def get_response(ints, intents_json):
             return random.choice(i['responses'])
     return "I'm not sure I understand that. Can you try rephrasing?"
 
+# Routes
 @app.route('/')
 def home():
-    """
-    Render the chatbot home page.
-    Ensure there is an 'index.html' file in the templates folder.
-    """
+    session['conversation'] = []  # Initialize conversation history
     return render_template('index.html')
 
-@app.route('/get', methods=['GET'])
+@app.route('/get', methods=['POST'])
 def chatbot_response():
-    """
-    Process the user message and return a response.
-    """
     try:
-        msg = request.args.get('msg')
-        if not msg:
-            return "Please provide a valid input."
+        data = request.get_json()
+        msg = data.get('message', '').strip()
         
-        ints = predict_class(msg, model)
-        res = get_response(ints, intents)
-        return res
+        if not msg:
+            return jsonify({'error': 'Empty message'}), 400
+        
+        # Initialize conversation history if it doesn't exist
+        if 'conversation' not in session:
+            session['conversation'] = []
+        
+        # Add user message to history
+        session['conversation'].append({'user': msg})
+        
+        # Get bot response
+        ints = predict_class(msg, resources['model'], resources['words'], resources['classes'])
+        res = get_response(ints, resources['intents'])
+        
+        # Add bot response to history
+        session['conversation'][-1]['bot'] = res
+        session.modified = True
+        
+        return jsonify({'response': res})
+    
     except Exception as e:
-        return f"An error occurred: {str(e)}"
+        app.logger.error(f"Error in chatbot response: {str(e)}")
+        return jsonify({'error': 'An error occurred processing your request'}), 500
 
-# # Run the app
-# if __name__ == "__main__":
-#     port = int(os.environ.get("PORT", 5000))
-#     app.run(host="0.0.0.0", port=port, debug=os.environ.get("DEBUG", False))
-# Replace the existing __main__ block with:
+@app.after_request
+def add_header(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
 if __name__ == "__main__":
-    from waitress import serve
     port = int(os.environ.get("PORT", 5000))
     serve(app, host="0.0.0.0", port=port)
