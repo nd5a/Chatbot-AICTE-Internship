@@ -14,45 +14,29 @@ nltk_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nltk_
 nltk.data.path.append(nltk_data_path)
 
 # Download required NLTK data
-required_nltk_data = ['punkt', 'wordnet', 'omw-1.4', 'punkt_tab']
+required_nltk_data = ['punkt', 'wordnet', 'omw-1.4']
 for data in required_nltk_data:
     try:
-        nltk.data.find(f'tokenizers/{data}' if data == 'punkt' else f'corpora/{data}' if data == 'wordnet' else data)
+        nltk.data.find(f'tokenizers/{data}' if data == 'punkt' else f'corpora/{data}')
     except LookupError:
         nltk.download(data, download_dir=nltk_data_path)
 
-# Initialize Flask app
+# Flask app config
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 app.config['SESSION_PERMANENT'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
+app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 mins
 
-# Load ML resources
-def load_resources():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    resources = {
-        'model': ('chatbot_model.h5', lambda path: load_model(path)),
-        'intents': ('intents.json', lambda path: json.load(open(path))),
-        'words': ('words.pkl', lambda path: pickle.load(open(path, 'rb'))),
-        'classes': ('classes.pkl', lambda path: pickle.load(open(path, 'rb')))
-    }
-    
-    loaded = {}
-    for name, (filename, loader) in resources.items():
-        try:
-            path = os.path.join(base_dir, filename)
-            loaded[name] = loader(path)
-        except Exception as e:
-            app.logger.error(f"Error loading {name}: {str(e)}")
-            raise
-    return loaded
+# Load resources
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+model = load_model(os.path.join(BASE_DIR, 'chatbot_model.h5'))
+intents = json.load(open(os.path.join(BASE_DIR, 'intents.json')))
+words = pickle.load(open(os.path.join(BASE_DIR, 'words.pkl'), 'rb'))
+classes = pickle.load(open(os.path.join(BASE_DIR, 'classes.pkl'), 'rb'))
 
-# Load all resources at startup
-resources = load_resources()
-
-# NLP Processing
 lemmatizer = WordNetLemmatizer()
 
+# NLP helpers
 def clean_up_sentence(sentence):
     sentence_words = nltk.word_tokenize(sentence)
     return [lemmatizer.lemmatize(word.lower()) for word in sentence_words]
@@ -66,7 +50,7 @@ def bow(sentence, words):
                 bag[i] = 1
     return np.array(bag)
 
-def predict_class(sentence, model, words, classes):
+def predict_class(sentence):
     p = bow(sentence, words)
     res = model.predict(np.array([p]))[0]
     ERROR_THRESHOLD = 0.25
@@ -74,12 +58,11 @@ def predict_class(sentence, model, words, classes):
     results.sort(key=lambda x: x[1], reverse=True)
     return [{"intent": classes[r[0]], "probability": str(r[1])} for r in results] if results else []
 
-def get_response(ints, intents_json):
-    if not ints:
+def get_response(intents_list):
+    if not intents_list:
         return "I'm not sure I understand that. Can you try rephrasing?"
-    
-    tag = ints[0]['intent']
-    for i in intents_json['intents']:
+    tag = intents_list[0]['intent']
+    for i in intents['intents']:
         if i['tag'] == tag:
             return random.choice(i['responses'])
     return "I'm not sure I understand that. Can you try rephrasing?"
@@ -87,7 +70,7 @@ def get_response(ints, intents_json):
 # Routes
 @app.route('/')
 def home():
-    session['conversation'] = []  # Initialize conversation history
+    session['conversation'] = []  # Initialize session
     return render_template('index.html')
 
 @app.route('/get', methods=['POST'])
@@ -95,25 +78,18 @@ def chatbot_response():
     try:
         data = request.get_json()
         msg = data.get('message', '').strip()
-        
         if not msg:
             return jsonify({'error': 'Empty message'}), 400
         
-        # Initialize conversation history if it doesn't exist
+        # Maintain session history
         if 'conversation' not in session:
             session['conversation'] = []
-        
-        # Add user message to history
+
         session['conversation'].append({'user': msg})
-        
-        # Get bot response
-        ints = predict_class(msg, resources['model'], resources['words'], resources['classes'])
-        res = get_response(ints, resources['intents'])
-        
-        # Add bot response to history
+        ints = predict_class(msg)
+        res = get_response(ints)
         session['conversation'][-1]['bot'] = res
         session.modified = True
-        
         return jsonify({'response': res})
     
     except Exception as e:
@@ -122,9 +98,9 @@ def chatbot_response():
 
 @app.after_request
 def add_header(response):
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Cache-Control'] = 'no-store'
     response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '-1'
+    response.headers['Expires'] = '0'
     return response
 
 if __name__ == "__main__":
