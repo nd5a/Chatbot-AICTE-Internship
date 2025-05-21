@@ -212,57 +212,80 @@ Software Engineer Portfolio Dhruvil Nakrani, Dhruvil Nakrani Instagram, Dhruvil 
       </div>
     </div>
 
-    <script>
-      const botTypingSound = new Audio(
-        "https://assets.mixkit.co/sfx/download/mixkit-positive-notification-951.wav"
-      );
-      const userMessageSound = new Audio(
-        "https://assets.mixkit.co/sfx/download/mixkit-select-click-1109.wav"
-      );
+  
+      <script>
+// Modified sendMessage function with proper POST handling
+async function sendMessage() {
+    const userInput = document.getElementById("userInput");
+    const messageText = userInput.value.trim();
+    const messages = document.getElementById("messages");
 
-      function sendMessage() {
-        const userInput = document.getElementById("userInput").value;
-        const messages = document.getElementById("messages");
+    if (!messageText) return;
 
-        if (!userInput.trim()) return;
+    // Clear input immediately
+    userInput.value = '';
+    
+    // Add user message
+    const userMsg = document.createElement("div");
+    userMsg.textContent = "You: " + messageText;
+    userMsg.classList.add("user");
+    messages.appendChild(userMsg);
 
-        // Play user message sound
-        userMessageSound.play();
+    // Add typing indicator
+    const typingMsg = document.createElement("div");
+    typingMsg.textContent = "Bot is typing...";
+    typingMsg.classList.add("typing");
+    messages.appendChild(typingMsg);
+    messages.scrollTop = messages.scrollHeight;
 
-        // Append user message
-        const userMsg = document.createElement("div");
-        userMsg.textContent = "You: " + userInput;
-        userMsg.classList.add("user");
-        messages.appendChild(userMsg);
+    try {
+        const response = await fetch('/get', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: messageText })
+        });
 
-        // Show bot typing animation
-        const typingMsg = document.createElement("div");
-        typingMsg.textContent = "Bot is typing...";
-        typingMsg.classList.add("typing");
-        messages.appendChild(typingMsg);
+        const data = await response.json();
+        
+        typingMsg.remove();
+        
+        if (data.error) {
+            showError(data.error);
+            return;
+        }
 
-        messages.scrollTop = messages.scrollHeight; // Auto-scroll
+        const botMsg = document.createElement("div");
+        botMsg.textContent = "Bot: " + data.response;
+        botMsg.classList.add("bot");
+        messages.appendChild(botMsg);
+        
+    } catch (error) {
+        typingMsg.remove();
+        showError("Connection error. Please try again.");
+    }
+    
+    messages.scrollTop = messages.scrollHeight;
+}
 
-        // Simulate bot typing with delay
-        setTimeout(() => {
-          botTypingSound.play(); // Play bot typing sound
-          typingMsg.remove(); // Remove typing animation
+// Add this error handling function
+function showError(message) {
+    const errorMsg = document.createElement("div");
+    errorMsg.textContent = "Error: " + message;
+    errorMsg.style.color = "#dc3545";
+    errorMsg.style.fontStyle = "italic";
+    document.getElementById("messages").appendChild(errorMsg);
+}
 
-          // Fetch bot response
-          fetch(`/get?msg=${encodeURIComponent(userInput)}`)
-            .then((response) => response.text())
-            .then((data) => {
-              const botMsg = document.createElement("div");
-              botMsg.textContent = "Bot: " + data;
-              botMsg.classList.add("bot");
-              messages.appendChild(botMsg);
-              messages.scrollTop = messages.scrollHeight; // Auto-scroll
-            });
-        }, 1500); // Simulate typing for 1.5 seconds
+// Enter key support
+document.getElementById('userInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
 
-        // Clear input field
-        document.getElementById("userInput").value = "";
-      }
     </script>
   </body>
 </html>
