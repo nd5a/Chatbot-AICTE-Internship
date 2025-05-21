@@ -13,13 +13,13 @@ from waitress import serve
 nltk_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nltk_data')
 nltk.data.path.append(nltk_data_path)
 
-# Download required NLTK data
-required_nltk_data = ['punkt', 'wordnet', 'omw-1.4']
-for data in required_nltk_data:
-    try:
-        nltk.data.find(f'tokenizers/{data}' if data == 'punkt' else f'corpora/{data}')
-    except LookupError:
-        nltk.download(data, download_dir=nltk_data_path)
+nltk.download('wordnet')
+nltk.download('punkt_tab') 
+nltk.data.path.append('./nltk_data')  # Specify a custom directory for NLTK data
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt', download_dir='./nltk_data')
 
 # Flask app config
 app = Flask(__name__)
