@@ -1,7 +1,7 @@
 # Chatbot-AICTE-Internship
 # 🤖 DN Chatbot - Complete Guide
 
-![Chatbot Demo](static/assets/download1.png)
+![Chatbot Demo](https://dn-chatbot-py.onrender.com/)
 
 ## 📝 Table of Contents
 - [Project Structure](#-project-structure)
