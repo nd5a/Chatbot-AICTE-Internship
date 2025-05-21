@@ -2,3 +2,4 @@ Flask
 tensorflow
 numpy
 nltk
+waitress>=2.1.2
