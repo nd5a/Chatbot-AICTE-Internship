@@ -102,6 +102,7 @@ import random
 import os
 
 nltk.download('wordnet')
+nltk.download('punkt_tab') 
 nltk.data.path.append('./nltk_data')  # Specify a custom directory for NLTK data
 try:
     nltk.data.find('tokenizers/punkt')
