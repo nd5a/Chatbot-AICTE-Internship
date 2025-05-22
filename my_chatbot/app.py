@@ -25,7 +25,7 @@ except LookupError:
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 app.config['SESSION_PERMANENT'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 mins
+app.config['PERMANENT_SESSION_LIFETIME'] = 7257600 # 12 Weeks
 
 # Load resources
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
